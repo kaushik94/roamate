@@ -1,0 +1,163 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global safety net default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && (request.auth.token.email_verified == true || request.auth.token.email != null);
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Checking group membership
+    function isGroupMember(groupId) {
+      return isVerifiedUser() && (
+        request.auth.uid == get(/databases/$(database)/documents/groups/$(groupId)).data.ownerId ||
+        request.auth.uid in get(/databases/$(database)/documents/groups/$(groupId)).data.memberUids
+      );
+    }
+
+    // USER Profile Entity Validations
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email'])
+        && data.keys().size() == 3
+        && data.uid is string
+        && data.uid == request.auth.uid
+        && data.displayName is string
+        && data.displayName.size() <= 150
+        && data.email is string
+        && data.email.size() <= 150;
+    }
+
+    // GROUP Entity Validations
+    function isValidGroup(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'members', 'memberUids', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 6
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.name is string
+        && data.name.size() <= 150
+        && data.members is list
+        && data.members.size() <= 100
+        && data.memberUids is list
+        && data.memberUids.size() <= 100
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // LEDGER Entity Validations
+    function isValidLedger(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'createdAt', 'updatedAt'])
+        && data.keys().size() == 4
+        && data.ownerId is string
+        && data.ownerId == request.auth.uid
+        && data.name is string
+        && data.name.size() <= 150
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    // EXPENSE Entity Validations
+    function isValidExpense(data) {
+      return data.keys().hasAll(['name', 'amount', 'description', 'createdAt'])
+        && data.keys().size() == 4
+        && data.name is string
+        && data.name.size() <= 100
+        && data.amount is number
+        && data.description is string
+        && data.description.size() <= 200
+        && data.createdAt == request.time;
+    }
+
+    // INVITATION Entity Validations
+    function isValidInvitation(data) {
+      return data.keys().hasAll(['email', 'groupId', 'groupName', 'nameInGroup', 'invitedBy', 'createdAt'])
+        && data.keys().size() == 6
+        && data.email is string
+        && data.email.size() <= 150
+        && data.groupId is string
+        && data.groupId.size() <= 100
+        && data.groupName is string
+        && data.groupName.size() <= 150
+        && data.nameInGroup is string
+        && data.nameInGroup.size() <= 100
+        && data.invitedBy is string
+        && data.invitedBy.size() <= 100
+        && data.createdAt == request.time;
+    }
+
+    // Rules for public registered users
+    match /users/{userId} {
+      allow get, list: if isSignedIn();
+      allow create, update: if isSignedIn() && userId == request.auth.uid && isValidUser(incoming());
+    }
+
+    // Rules for invitations
+    match /invitations/{invitationId} {
+      allow get, list: if isSignedIn();
+      allow create: if isVerifiedUser() && isValidId(invitationId) && isValidInvitation(incoming());
+      allow delete: if isSignedIn();
+    }
+
+    // Rules for Groups (Homies dropdown lists)
+    match /groups/{groupId} {
+      allow get: if isVerifiedUser() && (existing().ownerId == request.auth.uid || request.auth.uid in existing().memberUids);
+      allow list: if isVerifiedUser() && (resource.data.ownerId == request.auth.uid || request.auth.uid in resource.data.memberUids);
+      
+      allow create: if isVerifiedUser() && isValidId(groupId) && isValidGroup(incoming());
+      
+      // Allow member updates (adding members or linking uids)
+      allow update: if isVerifiedUser() 
+        && (existing().ownerId == request.auth.uid || request.auth.uid in existing().memberUids)
+        && incoming().ownerId == existing().ownerId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().name is string && incoming().name.size() <= 150
+        && incoming().members is list && incoming().members.size() <= 100
+        && incoming().memberUids is list && incoming().memberUids.size() <= 100;
+
+      allow delete: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+
+      // Subcollection for Group's Ledgers
+      match /ledgers/{ledgerId} {
+        allow get: if isGroupMember(groupId);
+        allow list: if isGroupMember(groupId);
+
+        allow create: if isGroupMember(groupId) && isValidId(ledgerId) && isValidLedger(incoming());
+        allow update: if isGroupMember(groupId) 
+          && incoming().ownerId == existing().ownerId
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().name is string && incoming().name.size() <= 150;
+        allow delete: if isGroupMember(groupId);
+
+        // Subcollection for Ledger's Expenses
+        match /expenses/{expenseId} {
+          allow get: if isGroupMember(groupId);
+          allow list: if isGroupMember(groupId);
+
+          allow create: if isGroupMember(groupId) && isValidId(expenseId) && isValidExpense(incoming());
+          allow delete: if isGroupMember(groupId);
+        }
+      }
+    }
+  }
+}

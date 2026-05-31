@@ -1,0 +1,6 @@
+{
+  "name": "RoamMate",
+  "description": "Speak into your mobile microphone to log what each person spent, and automatically generate an optimized split-expense debt ledger.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

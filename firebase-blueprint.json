@@ -1,0 +1,163 @@
+{
+  "entities": {
+    "user": {
+      "title": "User",
+      "description": "A public profile database entry for a user, enabling search lookup.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "displayName": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "uid",
+        "displayName",
+        "email"
+      ]
+    },
+    "group": {
+      "title": "Group",
+      "description": "A group (homies) that hosts multiple split ledger sheets and members.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "members": {
+          "type": "array"
+        },
+        "memberUids": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "members",
+        "memberUids",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ledger": {
+      "title": "Ledger",
+      "description": "An individual ledger sheet (e.g. Dinner, Trip) within a group.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "expense": {
+      "title": "Expense",
+      "description": "An individual transaction line logged in an active ledger sheet.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "description": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "description",
+        "createdAt"
+      ]
+    },
+    "invitation": {
+      "title": "Invitation",
+      "description": "A pending group invitation for an email address.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "groupId": {
+          "type": "string"
+        },
+        "groupName": {
+          "type": "string"
+        },
+        "nameInGroup": {
+          "type": "string"
+        },
+        "invitedBy": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "groupId",
+        "groupName",
+        "nameInGroup",
+        "invitedBy",
+        "createdAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Public user profile listings for lookup when adding members"
+    },
+    "/groups/{groupId}": {
+      "schema": "group",
+      "description": "Shared groups owned or joined by users"
+    },
+    "/groups/{groupId}/ledgers/{ledgerId}": {
+      "schema": "ledger",
+      "description": "Track sessions of splits inside a single group"
+    },
+    "/groups/{groupId}/ledgers/{ledgerId}/expenses/{expenseId}": {
+      "schema": "expense",
+      "description": "Individual expenditures logged inside a ledger of a group"
+    },
+    "/invitations/{invitationId}": {
+      "schema": "invitation",
+      "description": "Pending group invitations based on email address matching"
+    }
+  }
+}
